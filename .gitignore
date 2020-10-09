@@ -3,3 +3,4 @@
 /config/config.local.json
 package-lock.json
 .env
+/docs

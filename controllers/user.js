@@ -1,4 +1,6 @@
-var Role = require(process.env.DB_TYPE === 'mongodb' ? '../models/mongodb/role' : '../models/sql/role')
+var Role = require(process.env.DB_TYPE === 'mongodb'
+  ? '../models/mongodb/role'
+  : '../models/sql/role')
 var User = require(process.env.DB_TYPE === 'mongodb'
   ? '../models/mongodb/user'
   : '../models/sql/user')
@@ -11,9 +13,7 @@ var { optionsSetup } = require('./option')
 var { rolesSetup } = require('./role')
 var { getDefaultRole } = require('./role')
 
-var {
-  getOptionValue
-} = require('../helpers')
+var { getOptionValue } = require('../helpers')
 
 module.exports.getAuthFacebookCallback = async (req, res) => {
   const FRONTEND_URL = await getOptionValue('FRONTEND_URL')
@@ -32,18 +32,18 @@ module.exports.postAuthByProviderToken = async (req, res) => {
         uri: `https://graph.facebook.com/v2.12/${body.userID}`,
         qs: {
           access_token: body.accessToken,
-          fields: 'name, email, first_name, last_name'
+          fields: 'name, email, first_name, last_name',
         },
-        json: true
+        json: true,
       }
     } else if (provider === 'google') {
       data = {
         method: 'GET',
         uri: 'https://www.googleapis.com/oauth2/v1/userinfo',
         qs: {
-          access_token: body.accessToken
+          access_token: body.accessToken,
         },
-        json: true
+        json: true,
       }
     }
 
@@ -54,7 +54,7 @@ module.exports.postAuthByProviderToken = async (req, res) => {
         email: response.email,
         firstName: response.firstName || response.first_name,
         lastName: response.lastName || response.last_name,
-        provider
+        provider,
       },
       true,
       req
@@ -299,7 +299,7 @@ module.exports.registerUser = async (req, res) => {
       picture: req.body.picture,
       email: req.body.email,
       password: req.body.password,
-      passwordConfirmation: req.body.passwordConfirmation
+      passwordConfirmation: req.body.passwordConfirmation,
     }
 
     if (body.password !== body.passwordConfirmation) {
@@ -321,7 +321,11 @@ module.exports.registerUser = async (req, res) => {
     }`
     aventum.cache.cacheByKey(cacheKey, insertedUserData.user, 7200)
 
-    res.header('x-access-token', insertedUserData.token).send(insertedUserData.user)
+    aventum.cache.batchDeletionKeysByPattern('users:p:*')
+
+    res
+      .header('x-access-token', insertedUserData.token)
+      .send(insertedUserData.user)
   } catch (e) {
     res.status(400).send(e)
   }
@@ -342,8 +346,8 @@ module.exports.addNewUserWithConfEmail = async (userData, role, req) => {
       FRONTEND_URL + '/email-confirmation/' + confirmationToken
 
     EmailHelper.sendRegistrationEmail(user.email, confirmationLink, req).then(
-      i => {},
-      e => {}
+      (i) => {},
+      (e) => {}
     )
 
     return { user, token }
@@ -369,7 +373,7 @@ module.exports.postSetup = async (req, res) => {
       gender: req.body.gender,
       picture: req.body.picture,
       email: req.body.email,
-      password: req.body.password
+      password: req.body.password,
     }
 
     // 1) Setup the default options
@@ -380,7 +384,7 @@ module.exports.postSetup = async (req, res) => {
 
     const insertedUserData = await module.exports.addNewUserWithConfEmail(
       userData,
-      roles.find(e => e.name === 'super'),
+      roles.find((e) => e.name === 'super'),
       req
     )
 
@@ -391,7 +395,9 @@ module.exports.postSetup = async (req, res) => {
     }`
     aventum.cache.cacheByKey(cacheKey, insertedUserData.user, 7200)
 
-    res.header('x-access-token', insertedUserData.token).send(insertedUserData.user)
+    res
+      .header('x-access-token', insertedUserData.token)
+      .send(insertedUserData.user)
   } catch (e) {
     res.status(400).send(e)
   }
@@ -407,7 +413,7 @@ module.exports.postRegister = async (req, res) => {
       picture: req.body.picture,
       email: req.body.email,
       password: req.body.password,
-      passwordConfirmation: req.body.passwordConfirmation
+      passwordConfirmation: req.body.passwordConfirmation,
     }
 
     if (body.password !== body.passwordConfirmation) {
@@ -418,7 +424,7 @@ module.exports.postRegister = async (req, res) => {
 
     const DEFAULT_ROLE = await getOptionValue('DEFAULT_ROLE')
     const allRoles = await Role.getAllRoles()
-    body.roles = [allRoles.find(r => r.name === DEFAULT_ROLE).id]
+    body.roles = [allRoles.find((r) => r.name === DEFAULT_ROLE).id]
 
     const user = new User(body)
     await user.save()
@@ -434,8 +440,8 @@ module.exports.postRegister = async (req, res) => {
       FRONTEND_URL + '/email-confirmation/' + confirmationToken
 
     EmailHelper.sendRegistrationEmail(user.email, confirmationLink, req).then(
-      i => {},
-      e => {}
+      (i) => {},
+      (e) => {}
     )
 
     var cacheKey = `users:g:${getStringID(user.id)}${token}`
@@ -455,7 +461,7 @@ module.exports.patchChangeEmail = async (req, res) => {
       let user = await User.updateUser({
         id: req.user.id,
         values: body,
-        req
+        req,
       })
 
       if (!user) {
@@ -471,8 +477,8 @@ module.exports.patchChangeEmail = async (req, res) => {
         FRONTEND_URL + '/email-confirmation/' + confirmationToken
 
       EmailHelper.newEmailConfirmation(user.email, confirmationLink, req).then(
-        i => {},
-        e => {}
+        (i) => {},
+        (e) => {}
       )
 
       var stringUserID = getStringID(user.id)
@@ -513,12 +519,10 @@ module.exports.postResendConfirmationEmail = async (req, res) => {
 module.exports.patchChangePassword = async (req, res) => {
   var body = {
     newPassword: req.body.newPassword,
-    passwordConfirmation: req.body.passwordConfirmation
+    passwordConfirmation: req.body.passwordConfirmation,
   }
 
-  body = flow(
-    omitBy(isUndefined)
-  )(body)
+  body = flow(omitBy(isUndefined))(body)
 
   if (body.newPassword !== body.passwordConfirmation) {
     return res.status(400).send()
@@ -526,14 +530,12 @@ module.exports.patchChangePassword = async (req, res) => {
 
   body = { password: body.newPassword }
 
-  User.updateUser(
-    {
-      id: req.user.id,
-      values: body,
-      req
-    }
-  )
-    .then(async user => {
+  User.updateUser({
+    id: req.user.id,
+    values: body,
+    req,
+  })
+    .then(async (user) => {
       if (!user) {
         return res.status(404).send()
       }
@@ -541,7 +543,7 @@ module.exports.patchChangePassword = async (req, res) => {
       user = await aventum.hooks.applyFilters('onSendUser', user, req, res)
       res.send({ user })
     })
-    .catch(e => {
+    .catch((e) => {
       res.status(400).send()
     })
 }
@@ -555,18 +557,18 @@ module.exports.patchProfile = async (req, res) => {
       gender: req.body.gender,
       picture: req.body.picture,
       email: req.body.email,
-      password: req.body.password
+      password: req.body.password,
     }
 
     body = flow(
       omitBy(isUndefined),
-      omitBy(val => val === '')
+      omitBy((val) => val === '')
     )(body)
 
     let user = await User.updateUser({
       id: req.user.id,
       values: body,
-      req
+      req,
     })
 
     if (!user) {
@@ -598,18 +600,18 @@ module.exports.patchById = async (req, res) => {
       email: req.body.email,
       password: req.body.password,
       roles: req.body.roles,
-      capabilities: req.body.capabilities
+      capabilities: req.body.capabilities,
     }
 
     body = flow(
       omitBy(isUndefined),
-      omitBy(val => val === '')
+      omitBy((val) => val === '')
     )(body)
 
     const user = await User.updateUser({
       id,
       values: body,
-      req
+      req,
     })
 
     if (!user) {
@@ -678,23 +680,22 @@ module.exports.postEmailExist = async (req, res) => {
 module.exports.postResetPassword = async (req, res) => {
   var body = { password: req.body.password }
 
-  body = flow(
-    omitBy(isUndefined)
-  )(body)
+  body = flow(omitBy(isUndefined))(body)
 
   if (body.password) {
     User.updateUser({
       id: req.user.id,
       values: body,
-      req
-    }).then(user => {
-      if (!user) {
-        return res.status(404).send()
-      }
-
-      res.status(200).send()
+      req,
     })
-      .catch(e => {
+      .then((user) => {
+        if (!user) {
+          return res.status(404).send()
+        }
+
+        res.status(200).send()
+      })
+      .catch((e) => {
         res.status(400).send()
       })
   } else {
@@ -706,20 +707,21 @@ module.exports.postEmailConfirmation = (req, res) => {
   User.updateUser({
     id: req.user.id,
     values: { emailConfirmation: true },
-    req
-  }).then(user => {
-    if (!user) {
-      return res.status(404).send()
-    }
-
-    aventum.cache.batchDeletionKeysByPattern(
-        `users:g:${getStringID(user.id)}*`
-    )
-    aventum.cache.batchDeletionKeysByPattern('users:p:*')
-
-    res.status(200).send()
+    req,
   })
-    .catch(e => {
+    .then((user) => {
+      if (!user) {
+        return res.status(404).send()
+      }
+
+      aventum.cache.batchDeletionKeysByPattern(
+        `users:g:${getStringID(user.id)}*`
+      )
+      aventum.cache.batchDeletionKeysByPattern('users:p:*')
+
+      res.status(200).send()
+    })
+    .catch((e) => {
       res.status(400).send()
     })
 }
@@ -734,10 +736,10 @@ module.exports.postForgotPassword = async (req, res) => {
 
     // Send email to the user with reset password link
     EmailHelper.sendForgotPasswordEmail(user.email, resetLink, req)
-      .then(info => {
+      .then((info) => {
         res.status(200).send()
       })
-      .catch(error => {
+      .catch((error) => {
         return res.status(400).send(error)
       })
   } catch (e) {

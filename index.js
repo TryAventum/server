@@ -211,6 +211,13 @@ async function main() {
       }
     }
 
+    /**
+     * I believe here where the upgrade code must go.
+     */
+    // Check if there is update has to be made.
+    // Check if already update in progress(in case of cluster).
+    // Update Aventum
+
     require('./subscribers/user.js')
     require('./subscribers/schema.js')
     require('./cache/schemas.js')

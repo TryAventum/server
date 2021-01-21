@@ -212,11 +212,34 @@ async function main() {
     }
 
     /**
-     * I believe here where the upgrade code must go.
+     * Upgrade Aventum
      */
-    // Check if there is update has to be made.
+    /**
+     * Check if there is update has to be made.
+     */
+    //Get version number from the database
     // Check if already update in progress(in case of cluster).
-    // Update Aventum
+    let data
+    if (process.env.DB_TYPE === 'mongodb') {
+      const { db } = mongoose.connection
+      data = await db
+        .collection('options')
+        .find({ name: { $in: ['version', 'updating'] } })
+        .toArray()
+    } else {
+      data = await aventum
+        .knex('options')
+        .whereIn('name', ['version', 'updating'])
+    }
+
+    let versionInDB = data.find((i) => i.name === 'version')
+    let isUpdating = data.find((i) => i.name === 'updating')
+    if (versionInDB) {
+      versionInDB = versionInDB.value
+    }
+    if (!isUpdating) {
+      // Update Aventum
+    }
 
     require('./subscribers/user.js')
     require('./subscribers/schema.js')

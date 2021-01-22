@@ -9,7 +9,7 @@ var path = require('path')
 var spawn = require('child_process').spawn
 var mongoose = require('mongoose')
 
-function getStringID (id) {
+function getStringID(id) {
   if (id && typeof id === 'object') {
     return id.toString()
   } else {
@@ -17,22 +17,22 @@ function getStringID (id) {
   }
 }
 
-function isIqZip (value) {
+function isIqZip(value) {
   return /(^\d{5}$)|(^\d{5}-\d{4}$)/.test(value)
 }
 
 // https://stackoverflow.com/a/39893636/3263601
-function hasIntersection (arr1, arr2) {
-  return arr1.some(r => arr2.includes(r))
+function hasIntersection(arr1, arr2) {
+  return arr1.some((r) => arr2.includes(r))
 }
 
 // https://stackoverflow.com/a/784547/3263601
-function lineBreakToBr (str) {
+function lineBreakToBr(str) {
   str = str.replace(/(?:\r\n|\r|\n)/g, '<br />')
   return str
 }
 
-function deleteFiles (files) {
+function deleteFiles(files) {
   return new Promise((resolve, reject) => {
     var i = files.length
     if (i === 0) {
@@ -52,16 +52,16 @@ function deleteFiles (files) {
   })
 }
 
-function arrayUnique (arr) {
+function arrayUnique(arr) {
   return arr.filter((v, i, a) => a.indexOf(v) === i)
 }
 
 /**
  * Make array of objects that contains _id property unique
  */
-function arrayUniqueByID (arr) {
+function arrayUniqueByID(arr) {
   return arr.reduce((a, c) => {
-    var f = a.find(e => e._id.toString() === c._id.toString())
+    var f = a.find((e) => e._id.toString() === c._id.toString())
     if (f) {
       return a
     }
@@ -72,9 +72,9 @@ function arrayUniqueByID (arr) {
 /**
  * Make array of objects that contains a specific property unique
  */
-function arrayUniqueByProperty (arr, property) {
+function arrayUniqueByProperty(arr, property) {
   return arr.reduce((a, c) => {
-    var f = a.find(e => e[property] === c[property])
+    var f = a.find((e) => e[property] === c[property])
     if (f) {
       return a
     }
@@ -82,7 +82,7 @@ function arrayUniqueByProperty (arr, property) {
   }, [])
 }
 
-function setRealTypes (schema) {
+function setRealTypes(schema) {
   const newSchema = {}
 
   for (const s in schema) {
@@ -149,12 +149,12 @@ function setRealTypes (schema) {
   return newSchema
 }
 
-function requireUncached (module) {
+function requireUncached(module) {
   delete require.cache[require.resolve(module)]
   return require(module)
 }
 
-function clearAppRequireCache () {
+function clearAppRequireCache() {
   Object.keys(require.cache).forEach(function (key) {
     if (!key.includes('node_modules')) {
       delete require.cache[key]
@@ -162,7 +162,7 @@ function clearAppRequireCache () {
   })
 }
 
-function runNpmInstall (cwd) {
+function runNpmInstall(cwd) {
   return new Promise((resolve, reject) => {
     var cproc = spawn('npm', ['install'], { cwd, shell: true })
 
@@ -176,30 +176,30 @@ function runNpmInstall (cwd) {
   })
 }
 
-function runNpmPack (options) {
+function runNpmPack(options) {
   return new Promise((resolve, reject) => {
     var cproc = spawn('npm', ['pack', options.package], {
       cwd: options.cwd,
-      shell: true
+      shell: true,
     })
 
     var allData = ''
-    cproc.stdout.on('data', data => {
+    cproc.stdout.on('data', (data) => {
       allData += data
     })
 
-    cproc.stderr.on('data', data => {
+    cproc.stderr.on('data', (data) => {
       // console.log(`stderr: ${data}`)
     })
 
-    cproc.on('close', code => {
+    cproc.on('close', (code) => {
       resolve(allData)
       //   console.log(`child process exited with code ${code}`);
     })
   })
 }
 
-function gitClone (options) {
+function gitClone(options) {
   return new Promise((resolve, reject) => {
     var gitC = spawn('git', ['clone', options.url], { cwd: options.path })
 
@@ -218,12 +218,12 @@ function gitClone (options) {
  * @param {string} startPath the directory to search in
  * @param {RegExp} filter the files must match this filter
  */
-function listExtensions (startPath, filter = /package.json/) {
+function listExtensions(startPath, filter = /package.json/) {
   var foundedFiles = []
 
   var completedPaths = []
 
-  function finder (startPath, filter) {
+  function finder(startPath, filter) {
     if (!fs.existsSync(startPath)) {
       console.log('no dir ', startPath)
       return
@@ -243,7 +243,7 @@ function listExtensions (startPath, filter = /package.json/) {
        * so there is no need to look into the folders within these paths,
        * i.e. stop looking into directory tree after find the first package.json file
        */
-      if (completedPaths.some(p => filename.startsWith(p))) {
+      if (completedPaths.some((p) => filename.startsWith(p))) {
         continue
       }
 
@@ -275,10 +275,10 @@ function listExtensions (startPath, filter = /package.json/) {
  * @param {Array} objs The objects that we want to remove the properties from them.
  * @param {Array} cleanFrom The properties that we want to remove from the objects.
  */
-function deletePropertiesFromObjects (objs, cleanFrom = []) {
-  objs = objs.map(obj => {
+function deletePropertiesFromObjects(objs, cleanFrom = []) {
+  objs = objs.map((obj) => {
     Object.keys(obj).forEach(
-      key => cleanFrom.includes(key) && delete obj[key]
+      (key) => cleanFrom.includes(key) && delete obj[key]
     )
 
     return obj
@@ -290,7 +290,7 @@ function deletePropertiesFromObjects (objs, cleanFrom = []) {
 /**
  * @param {Array} promises
  */
-async function sequentiallyResolvePromises (promises) {
+async function sequentiallyResolvePromises(promises) {
   for (const fun of promises) {
     await fun
   }
@@ -313,5 +313,5 @@ module.exports = {
   runNpmPack,
   listExtensions,
   deletePropertiesFromObjects,
-  sequentiallyResolvePromises
+  sequentiallyResolvePromises,
 }

@@ -6,6 +6,9 @@ aventum.version = require('./package.json').version
 aventum.dir = __dirname
 
 var fse = require('fs-extra')
+var fs = require('fs')
+const util = require('util')
+const semver = require('semver')
 const express = require('express')
 var helmet = require('helmet')
 const cors = require('cors')
@@ -14,6 +17,7 @@ const bodyParser = require('body-parser')
 var i18next = require('i18next')
 const path = require('path')
 const join = path.join
+const readDir = util.promisify(fs.readdir)
 
 const i18nextMiddleware = require('i18next-express-middleware')
 const i18nextBackend = require('i18next-node-fs-backend')
@@ -108,6 +112,79 @@ async function connectToDB() {
   } catch (error) {
     console.log(error)
     throw new Error(error)
+  }
+}
+
+async function upgradeAventum() {
+  /**
+   * Check if there is update has to be made.
+   */
+  //Get version number from the database
+  // Check if already update in progress(in case of cluster).
+  let data
+  if (process.env.DB_TYPE === 'mongodb') {
+    const { db } = mongoose.connection
+    data = await db
+      .collection('options')
+      .find({ name: { $in: ['version', 'updating'] } })
+      .toArray()
+  } else {
+    data = await aventum
+      .knex('options')
+      .whereIn('name', ['version', 'updating'])
+  }
+
+  let versionInDB = data.find((i) => i.name === 'version')
+  let isUpdating = data.find((i) => i.name === 'updating')
+  if (versionInDB) {
+    versionInDB = versionInDB.value
+  }
+  if (!isUpdating) {
+    // Update Aventum
+    /**
+       * Upgrade folder/file structure
+        📦upgrades
+        ┣ 📂v1
+        ┃ ┣ 📂1.0.1
+        ┃ ┃ ┗ 📜index.js
+        ┃ ┣ 📂1.0.3
+        ┃ ┃ ┗ 📜index.js
+        ┃ ┣ 📂1.0.5
+        ┃ ┃ ┗ 📜index.js
+        ┃ ┗ 📂1.1.0
+        ┃ ┃ ┗ 📜index.js
+        ┗ 📂v2
+        ┃ ┣ 📂2.0.0
+        ┃ ┃ ┗ 📜index.js
+        ┃ ┣ 📂2.0.1
+        ┃ ┃ ┗ 📜index.js
+        ┃ ┗ 📂2.0.5
+        ┃ ┃ ┗ 📜index.js
+
+       * The index file will export default async function.
+       */
+    const versionList = await readDir(path.join(__dirname, './upgrades'))
+    let allFiles = []
+    for (const folder of versionList) {
+      const fileList = await readDir(
+        path.join(__dirname, `./upgrades/${folder}`)
+      )
+      allFiles = [...allFiles, ...fileList]
+    }
+
+    // Get only the versions that are greater than versionInDB and less than or equal to aventum.version
+    const onlyThese = allFiles.filter((f) =>
+      semver.satisfies(f, `>${versionInDB} <=${aventum.version}`)
+    )
+
+    for (const file of onlyThese) {
+      var upgradeFn = require(path.join(
+        __dirname,
+        `./upgrades/v${file.charAt(0)}/${file}`
+      ))
+
+      await upgradeFn()
+    }
   }
 }
 
@@ -214,32 +291,7 @@ async function main() {
     /**
      * Upgrade Aventum
      */
-    /**
-     * Check if there is update has to be made.
-     */
-    //Get version number from the database
-    // Check if already update in progress(in case of cluster).
-    let data
-    if (process.env.DB_TYPE === 'mongodb') {
-      const { db } = mongoose.connection
-      data = await db
-        .collection('options')
-        .find({ name: { $in: ['version', 'updating'] } })
-        .toArray()
-    } else {
-      data = await aventum
-        .knex('options')
-        .whereIn('name', ['version', 'updating'])
-    }
-
-    let versionInDB = data.find((i) => i.name === 'version')
-    let isUpdating = data.find((i) => i.name === 'updating')
-    if (versionInDB) {
-      versionInDB = versionInDB.value
-    }
-    if (!isUpdating) {
-      // Update Aventum
-    }
+    await upgradeAventum()
 
     require('./subscribers/user.js')
     require('./subscribers/schema.js')

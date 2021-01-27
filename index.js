@@ -6,9 +6,6 @@ aventum.version = require('./package.json').version
 aventum.dir = __dirname
 
 var fse = require('fs-extra')
-var fs = require('fs')
-const util = require('util')
-const semver = require('semver')
 const express = require('express')
 var helmet = require('helmet')
 const cors = require('cors')
@@ -17,7 +14,6 @@ const bodyParser = require('body-parser')
 var i18next = require('i18next')
 const path = require('path')
 const join = path.join
-const readDir = util.promisify(fs.readdir)
 
 const i18nextMiddleware = require('i18next-express-middleware')
 const i18nextBackend = require('i18next-node-fs-backend')
@@ -61,6 +57,7 @@ aventum.i18n = i18next
 require('./prototype-extension.js')
 var { requireUncached, clearAppRequireCache } = require('./std-helpers')
 const { getAllExtensions } = require('./extensions-helpers')
+const updateAventum = require('./helpers/update')
 
 var redis = new Redis({
   port: process.env.REDIS_PORT,
@@ -112,131 +109,6 @@ async function connectToDB() {
   } catch (error) {
     console.log(error)
     throw new Error(error)
-  }
-}
-
-async function upgradeAventum() {
-  /**
-   * Check if there is update has to be made.
-   */
-
-  // Check if the upgrade folder exists.
-  const upgradeFolderPath = path.join(__dirname, './upgrades')
-
-  var upgradeFolderExist = await fse.pathExists(upgradeFolderPath)
-
-  if (!upgradeFolderExist) {
-    return
-  }
-
-  // Get version number from the database
-  // Check if already update in progress(in case of cluster).
-  let data
-  if (process.env.DB_TYPE === 'mongodb') {
-    const { db } = mongoose.connection
-    data = await db
-      .collection('options')
-      .find({ name: { $in: ['version', 'updating'] } })
-      .toArray()
-  } else {
-    data = await aventum
-      .knex('options')
-      .whereIn('name', ['version', 'updating'])
-  }
-
-  let vDB = data.find((i) => i.name === 'version')
-  let isUpdating = data.find((i) => i.name === 'updating')
-
-  let versionInDB = vDB ? vDB.value : '1.0.0'
-
-  if (!isUpdating && versionInDB !== aventum.version) {
-    // Update Aventum
-    // Insert "updating" record into the database
-    if (process.env.DB_TYPE === 'mongodb') {
-      const { db } = mongoose.connection
-      data = await db
-        .collection('options')
-        .insertOne({ name: 'updating', value: 'true' })
-    } else {
-      await aventum
-        .knex('options')
-        .insert([{ name: 'updating', value: 'true' }])
-    }
-    /**
-       * Upgrade folder/file structure
-        📦upgrades
-        ┣ 📂v1
-        ┃ ┣ 📂1.0.1
-        ┃ ┃ ┗ 📜index.js
-        ┃ ┣ 📂1.0.3
-        ┃ ┃ ┗ 📜index.js
-        ┃ ┣ 📂1.0.5
-        ┃ ┃ ┗ 📜index.js
-        ┃ ┗ 📂1.1.0
-        ┃ ┃ ┗ 📜index.js
-        ┗ 📂v2
-        ┃ ┣ 📂2.0.0
-        ┃ ┃ ┗ 📜index.js
-        ┃ ┣ 📂2.0.1
-        ┃ ┃ ┗ 📜index.js
-        ┃ ┗ 📂2.0.5
-        ┃ ┃ ┗ 📜index.js
-
-       * The index file will export default async function.
-       */
-    const versionList = await readDir(upgradeFolderPath)
-    let allFiles = []
-    for (const folder of versionList) {
-      const fileList = await readDir(
-        path.join(__dirname, `./upgrades/${folder}`)
-      )
-      allFiles = [...allFiles, ...fileList]
-    }
-
-    // Get only the versions that are greater than versionInDB and less than or equal to aventum.version
-    const onlyThese = allFiles.filter((f) =>
-      semver.satisfies(f, `>${versionInDB} <=${aventum.version}`)
-    )
-
-    for (const file of onlyThese) {
-      var upgradeFn = require(path.join(
-        __dirname,
-        `./upgrades/v${file.charAt(0)}/${file}`
-      ))
-
-      await upgradeFn()
-    }
-    // Update the version number in the database.
-    if (process.env.DB_TYPE === 'mongodb') {
-      const { db } = mongoose.connection
-      data = await db
-        .collection('options')
-        .update(
-          { name: 'version' },
-          { $set: { name: 'version', value: aventum.version } },
-          { upsert: true }
-        )
-    } else {
-      if (vDB) {
-        // Update the version record
-        await aventum
-          .knex('options')
-          .where({ name: 'version' })
-          .update({ value: aventum.version })
-      } else {
-        // Insert new record
-        await aventum
-          .knex('options')
-          .insert([{ name: 'version', value: aventum.version }])
-      }
-    }
-    // Remove "updating" record.
-    if (process.env.DB_TYPE === 'mongodb') {
-      const { db } = mongoose.connection
-      data = await db.collection('options').deleteOne({ name: 'updating' })
-    } else {
-      await aventum.knex('options').where('updating', 'true').del()
-    }
   }
 }
 
@@ -343,7 +215,7 @@ async function main() {
     /**
      * Upgrade Aventum
      */
-    await upgradeAventum()
+    await updateAventum()
 
     require('./subscribers/user.js')
     require('./subscribers/schema.js')

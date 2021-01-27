@@ -50,10 +50,10 @@
     "rate-limiter-flexible": "^1.1.6",
     "request": "^2.87.0",
     "request-promise": "^4.2.2",
+    "semver": "^7.3.4",
     "tar": "^4.4.10",
     "uuid": "^3.3.2",
     "validate-npm-package-name": "^3.0.0",
-    "semver": "^7.3.4",
     "winston": "^3.3.3"
   },
   "devDependencies": {

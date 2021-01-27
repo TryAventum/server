@@ -119,7 +119,17 @@ async function upgradeAventum() {
   /**
    * Check if there is update has to be made.
    */
-  //Get version number from the database
+
+  // Check if the upgrade folder exists.
+  const upgradeFolderPath = path.join(__dirname, './upgrades')
+
+  var upgradeFolderExist = await fse.pathExists(upgradeFolderPath)
+
+  if (!upgradeFolderExist) {
+    return
+  }
+
+  // Get version number from the database
   // Check if already update in progress(in case of cluster).
   let data
   if (process.env.DB_TYPE === 'mongodb') {
@@ -134,13 +144,24 @@ async function upgradeAventum() {
       .whereIn('name', ['version', 'updating'])
   }
 
-  let versionInDB = data.find((i) => i.name === 'version')
+  let vDB = data.find((i) => i.name === 'version')
   let isUpdating = data.find((i) => i.name === 'updating')
-  if (versionInDB) {
-    versionInDB = versionInDB.value
-  }
-  if (!isUpdating) {
+
+  let versionInDB = vDB ? vDB.value : '1.0.0'
+
+  if (!isUpdating && versionInDB !== aventum.version) {
     // Update Aventum
+    // Insert "updating" record into the database
+    if (process.env.DB_TYPE === 'mongodb') {
+      const { db } = mongoose.connection
+      data = await db
+        .collection('options')
+        .insertOne({ name: 'updating', value: 'true' })
+    } else {
+      await aventum
+        .knex('options')
+        .insert([{ name: 'updating', value: 'true' }])
+    }
     /**
        * Upgrade folder/file structure
         📦upgrades
@@ -163,7 +184,7 @@ async function upgradeAventum() {
 
        * The index file will export default async function.
        */
-    const versionList = await readDir(path.join(__dirname, './upgrades'))
+    const versionList = await readDir(upgradeFolderPath)
     let allFiles = []
     for (const folder of versionList) {
       const fileList = await readDir(
@@ -184,6 +205,37 @@ async function upgradeAventum() {
       ))
 
       await upgradeFn()
+    }
+    // Update the version number in the database.
+    if (process.env.DB_TYPE === 'mongodb') {
+      const { db } = mongoose.connection
+      data = await db
+        .collection('options')
+        .update(
+          { name: 'version' },
+          { $set: { name: 'version', value: aventum.version } },
+          { upsert: true }
+        )
+    } else {
+      if (vDB) {
+        // Update the version record
+        await aventum
+          .knex('options')
+          .where({ name: 'version' })
+          .update({ value: aventum.version })
+      } else {
+        // Insert new record
+        await aventum
+          .knex('options')
+          .insert([{ name: 'version', value: aventum.version }])
+      }
+    }
+    // Remove "updating" record.
+    if (process.env.DB_TYPE === 'mongodb') {
+      const { db } = mongoose.connection
+      data = await db.collection('options').deleteOne({ name: 'updating' })
+    } else {
+      await aventum.knex('options').where('updating', 'true').del()
     }
   }
 }

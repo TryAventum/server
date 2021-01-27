@@ -128,5 +128,8 @@ module.exports = async () => {
     } else {
       await aventum.knex('options').where('updating', 'true').del()
     }
+  } else if (isUpdating) {
+    console.error('Update in progress!')
+    process.exit(1)
   }
 }

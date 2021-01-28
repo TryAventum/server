@@ -11,12 +11,12 @@ module.exports = async () => {
    * Check if there is update has to be made.
    */
 
-  // Check if the upgrade folder exists.
-  const upgradeFolderPath = path.join(__dirname, '../updates')
+  // Check if the update folder exists.
+  const updateFolderPath = path.join(__dirname, '../updates')
 
-  var upgradeFolderExist = await fse.pathExists(upgradeFolderPath)
+  var updateFolderExist = await fse.pathExists(updateFolderPath)
 
-  if (!upgradeFolderExist) {
+  if (!updateFolderExist) {
     return
   }
 
@@ -54,7 +54,7 @@ module.exports = async () => {
         .insert([{ name: 'updating', value: 'true' }])
     }
     /**
-         * Upgrade folder/file structure
+         * Update folder/file structure
           📦updates
           ┣ 📂v1
           ┃ ┣ 📂1.0.1
@@ -75,7 +75,7 @@ module.exports = async () => {
   
          * The index file will export default async function.
          */
-    const versionList = await readDir(upgradeFolderPath)
+    const versionList = updateFolderExist ? await readDir(updateFolderPath) : []
     let allFiles = []
     for (const folder of versionList) {
       const fileList = await readDir(
@@ -90,12 +90,12 @@ module.exports = async () => {
     )
 
     for (const file of onlyThese) {
-      var upgradeFn = require(path.join(
+      var updateFn = require(path.join(
         __dirname,
         `../updates/v${file.charAt(0)}/${file}`
       ))
 
-      await upgradeFn()
+      await updateFn()
     }
     // Update the version number in the database.
     if (process.env.DB_TYPE === 'mongodb') {

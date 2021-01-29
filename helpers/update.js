@@ -1,10 +1,37 @@
 const semver = require('semver')
 var fs = require('fs')
+const winston = require('winston')
 var fse = require('fs-extra')
 const util = require('util')
 const path = require('path')
 var mongoose = require('mongoose')
 const readDir = util.promisify(fs.readdir)
+
+const updateDBVersion = async (versionInDB, newVersion) => {
+  if (process.env.DB_TYPE === 'mongodb') {
+    const { db } = mongoose.connection
+    await db
+      .collection('options')
+      .update(
+        { name: 'version' },
+        { $set: { name: 'version', value: newVersion } },
+        { upsert: true }
+      )
+  } else {
+    if (versionInDB) {
+      // Update the version record
+      await aventum
+        .knex('options')
+        .where({ name: 'version' })
+        .update({ value: newVersion })
+    } else {
+      // Insert new record
+      await aventum
+        .knex('options')
+        .insert([{ name: 'version', value: newVersion }])
+    }
+  }
+}
 
 module.exports = async () => {
   /**
@@ -42,6 +69,38 @@ module.exports = async () => {
 
   if (!isUpdating && versionInDB !== aventum.version) {
     // Update Aventum
+    // Prepare the log
+    const logFormat = winston.format.printf(
+      ({ level, message, label, timestamp }) => {
+        return `${timestamp} [${label}] ${level}: ${message}`
+      }
+    )
+
+    const logger = winston.createLogger({
+      transports: [
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.splat(),
+            winston.format.label({ label: 'Update Process' }),
+            winston.format.timestamp(),
+            logFormat
+          ),
+        }),
+        new winston.transports.File({
+          filename: path.join(__dirname, '../contents/logs/update.log'),
+          options: { flags: 'w' },
+          level: 'error',
+          format: winston.format.combine(
+            winston.format.splat(),
+            winston.format.label({ label: 'Update Process' }),
+            winston.format.timestamp(),
+            logFormat
+          ),
+        }),
+      ],
+    })
+
     // Insert "updating" record into the database
     if (process.env.DB_TYPE === 'mongodb') {
       const { db } = mongoose.connection
@@ -90,36 +149,14 @@ module.exports = async () => {
     )
 
     for (const file of onlyThese) {
-      var updateFn = require(path.join(
-        __dirname,
-        `../updates/v${file.charAt(0)}/${file}`
-      ))
+      const v = file.charAt(0)
+      var updateFn = require(path.join(__dirname, `../updates/v${v}/${file}`))
 
-      await updateFn()
-    }
-    // Update the version number in the database.
-    if (process.env.DB_TYPE === 'mongodb') {
-      const { db } = mongoose.connection
-      data = await db
-        .collection('options')
-        .update(
-          { name: 'version' },
-          { $set: { name: 'version', value: aventum.version } },
-          { upsert: true }
-        )
-    } else {
-      if (vDB) {
-        // Update the version record
-        await aventum
-          .knex('options')
-          .where({ name: 'version' })
-          .update({ value: aventum.version })
-      } else {
-        // Insert new record
-        await aventum
-          .knex('options')
-          .insert([{ name: 'version', value: aventum.version }])
-      }
+      logger.info(`Start updating to version ${file}`)
+      await updateFn(logger)
+      // Update completed new update the version number in the database.
+      await updateDBVersion(vDB, file)
+      logger.info(`Updating to v${file} completed!`)
     }
     // Remove "updating" record.
     if (process.env.DB_TYPE === 'mongodb') {

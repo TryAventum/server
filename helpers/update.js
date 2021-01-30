@@ -148,23 +148,37 @@ module.exports = async () => {
       semver.satisfies(f, `>${versionInDB} <=${aventum.version}`)
     )
 
+    if (onlyThese.length) {
+      logger.info(`Database update process started...`)
+    }
+
     for (const file of onlyThese) {
       const v = file.charAt(0)
       var updateFn = require(path.join(__dirname, `../updates/v${v}/${file}`))
 
       logger.info(`Start updating to version ${file}`)
-      await updateFn(logger)
+      await updateFn({ logger })
       // Update completed new update the version number in the database.
       await updateDBVersion(vDB, file)
       logger.info(`Updating to v${file} completed!`)
     }
+
+    if (onlyThese.length) {
+      logger.info(
+        `Database updated successfully completed, now doing some clean...`
+      )
+    }
+
     // Remove "updating" record.
+    logger.info(`Remove "updating" record...`)
     if (process.env.DB_TYPE === 'mongodb') {
       const { db } = mongoose.connection
       data = await db.collection('options').deleteOne({ name: 'updating' })
     } else {
       await aventum.knex('options').where('updating', 'true').del()
     }
+    logger.info(`"updating" record removed successfully...`)
+    logger.info(`Database update finished!`)
   } else if (isUpdating) {
     console.error('Update in progress!')
     process.exit(1)

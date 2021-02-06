@@ -26,7 +26,7 @@ const releaseLock = async (lockName) => {
 
 const createLock = async ({
   lockName,
-  releaseTimeout,
+  releaseTimeout = 3600000, // Default to 1 hour
   currentLock,
   logger,
 }) => {
@@ -38,7 +38,7 @@ const createLock = async ({
     let currentDate = new Date()
     currentDate = currentDate.getTime()
     // The lock valid!
-    if (lockInDB - releaseTimeout > currentDate) {
+    if (lockInDB > currentDate - releaseTimeout) {
       return false
     } else {
       // The lock expired! delete it!
@@ -128,7 +128,7 @@ module.exports = async () => {
 
   if (versionInDB !== aventum.version) {
     // Update Aventum
-    // Lock the database for 15 minutes
+    // Lock the database for 15 minutes, to prevent multiple updates occurring.
     const lock = await createLock({
       lockName: 'coreUpdater',
       releaseTimeout: 900000, // 900000 milliseconds === 15 minutes
@@ -136,7 +136,7 @@ module.exports = async () => {
     })
 
     if (!lock) {
-      console.error(`Database locked, update in progress!`)
+      console.error(`Database locked, probably update in progress!`)
       process.exit(1)
     }
 
@@ -223,6 +223,6 @@ module.exports = async () => {
       logger.info(`Updating to v${file} completed!`)
     }
 
-    logger.info(`Database update finished!`)
+    logger.info(`Database update completed successfully!`)
   }
 }

@@ -162,7 +162,6 @@ module.exports = async () => {
         new winston.transports.File({
           filename: path.join(__dirname, '../contents/logs/update.log'),
           options: { flags: 'w' },
-          level: 'error',
           format: winston.format.combine(
             winston.format.splat(),
             winston.format.label({ label: 'Update Process' }),

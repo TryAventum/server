@@ -32,7 +32,7 @@ const createLock = async ({
 }) => {
   if (currentLock) {
     // Check to see if the lock is still valid.
-    let lockInDB = new Date(currentLock.value)
+    let lockInDB = new Date(currentLock)
     lockInDB = lockInDB.getTime()
 
     let currentDate = new Date()
@@ -107,7 +107,7 @@ module.exports = async () => {
   }
 
   // Get version number from the database
-  // Check if already update in progress(in case of cluster).
+  // and get coreUpdater.lock to check if there are already update in progress(in case of cluster).
   let data
   if (process.env.DB_TYPE === 'mongodb') {
     const { db } = mongoose.connection
@@ -127,12 +127,13 @@ module.exports = async () => {
   const versionInDB = vDB ? vDB.value : '1.0.0'
 
   if (versionInDB !== aventum.version) {
-    // Update Aventum
+    // We maybe have to update Aventum!
+
     // Lock the database for 15 minutes, to prevent multiple updates occurring.
     const lock = await createLock({
       lockName: 'coreUpdater',
       releaseTimeout: 900000, // 900000 milliseconds === 15 minutes
-      currentLock,
+      currentLock: currentLock ? currentLock.value : null,
     })
 
     if (!lock) {
@@ -223,6 +224,8 @@ module.exports = async () => {
       logger.info(`Updating to v${file} completed!`)
     }
 
-    logger.info(`Database update completed successfully!`)
+    if (onlyThese.length) {
+      logger.info(`Database update completed successfully!`)
+    }
   }
 }

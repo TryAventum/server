@@ -160,7 +160,7 @@ module.exports = async () => {
           ),
         }),
         new winston.transports.File({
-          filename: path.join(__dirname, '../contents/logs/update.log'),
+          filename: path.join(__dirname, '../content/logs/update.log'),
           options: { flags: 'w' },
           format: winston.format.combine(
             winston.format.splat(),

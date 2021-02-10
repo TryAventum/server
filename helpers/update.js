@@ -17,7 +17,7 @@ const releaseLock = async (lockName) => {
   } else {
     result = await aventum
       .knex('options')
-      .where(lockName + '.lock', 'true')
+      .where('name', lockName + '.lock')
       .del()
   }
 
@@ -223,6 +223,8 @@ module.exports = async () => {
       await updateDBVersion(vDB, file)
       logger.info(`Updating to v${file} completed!`)
     }
+
+    await releaseLock('coreUpdater')
 
     if (onlyThese.length) {
       logger.info(`Database update completed successfully!`)

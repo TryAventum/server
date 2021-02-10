@@ -72,8 +72,8 @@ const updateDBVersion = async (versionInDB, newVersion) => {
     await db
       .collection('options')
       .update(
-        { name: 'version' },
-        { $set: { name: 'version', value: newVersion } },
+        { name: 'AVENTUM_VERSION' },
+        { $set: { name: 'AVENTUM_VERSION', value: newVersion } },
         { upsert: true }
       )
   } else {
@@ -81,13 +81,13 @@ const updateDBVersion = async (versionInDB, newVersion) => {
       // Update the version record
       await aventum
         .knex('options')
-        .where({ name: 'version' })
+        .where({ name: 'AVENTUM_VERSION' })
         .update({ value: newVersion })
     } else {
       // Insert new record
       await aventum
         .knex('options')
-        .insert([{ name: 'version', value: newVersion }])
+        .insert([{ name: 'AVENTUM_VERSION', value: newVersion }])
     }
   }
 }
@@ -113,15 +113,15 @@ module.exports = async () => {
     const { db } = mongoose.connection
     data = await db
       .collection('options')
-      .find({ name: { $in: ['version', 'coreUpdater.lock'] } })
+      .find({ name: { $in: ['AVENTUM_VERSION', 'coreUpdater.lock'] } })
       .toArray()
   } else {
     data = await aventum
       .knex('options')
-      .whereIn('name', ['version', 'coreUpdater.lock'])
+      .whereIn('name', ['AVENTUM_VERSION', 'coreUpdater.lock'])
   }
 
-  const vDB = data.find((i) => i.name === 'version')
+  const vDB = data.find((i) => i.name === 'AVENTUM_VERSION')
   const currentLock = data.find((i) => i.name === 'coreUpdater.lock')
 
   const versionInDB = vDB ? vDB.value : '1.0.0'
